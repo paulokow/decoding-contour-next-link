@@ -1,6 +1,9 @@
-from helpers import DateTimeHelper, BinaryDataDecoder, NumberHelper
+from .helpers import DateTimeHelper, BinaryDataDecoder, NumberHelper
 import struct
+import logging
 from datetime import timedelta
+
+logger = logging.getLogger(__name__)
 
 class NGPConstants:
     class BG_UNITS:
@@ -394,9 +397,9 @@ class SensorGlucoseReadingsEvent(NGPHistoryEvent):
 
     def allNestedEvents(self):
         pos = 15
-        for i in range(0, self.numberOfReadings):
+        for i in range(self.numberOfReadings - 1, -1, -1):
             #const timestamp = new NGPUtil.NGPTimestamp(this.timestamp.rtc - (i * this.minutesBetweenReadings * 60), this.timestamp.offset);
-            timestamp = self.timestamp + timedelta(minutes = i * self.minutesBetweenReadings)
+            timestamp = self.timestamp - timedelta(minutes = i * self.minutesBetweenReadings)
             payloadDecoded = struct.unpack( '>BBHBhBB', self.eventData[pos:pos + 9] )
 
             #const sg = ((this.eventData[pos] & 3) << 8) | this.eventData[pos + 1];
@@ -456,8 +459,8 @@ class SensorGlucoseReading(NGPHistoryEvent):
                  noisyData = False,
                  discardData = False,
                  sensorError = False):
-        self.timestamp = timestamp
-        self.dynamicActionRequestor = dynamicActionRequestor
+        self._timestamp = timestamp
+        self._dynamicActionRequestor = dynamicActionRequestor
         self.sg = sg
         self.predictedSg = predictedSg
         self.isig = isig
@@ -484,8 +487,15 @@ class SensorGlucoseReading(NGPHistoryEvent):
 
     @property
     def source(self):
-        # No idea what "source" means.
-        return BinaryDataDecoder.readByte(self.eventData, 0x01)# self.eventData[0x01];
+        return self._dynamicActionRequestor
+
+    @property
+    def dynamicActionRequestor(self):
+        return self._dynamicActionRequestor
+
+    @property
+    def timestamp(self):
+        return self._timestamp
 
     @property
     def size(self):
